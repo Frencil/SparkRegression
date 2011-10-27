@@ -4,6 +4,23 @@
  * SparkRegression - a tool for applying regression curves to data sets
  * 
  * @author Chris Clark <cclark@sparkfun.com>
+ *
+ * BASIC USAGE
+ *
+ * $reg = new SparkRegression($data);
+ * $reg->generateAllCurves();
+ *
+ * This applies regression curves of six basic types to your data set and
+ * automatically selects the most accurate curve based on least squares distance
+ * to the data set.  From here you can evaluate the most accurate projection
+ * at any x value point like so:
+ *
+ * $reg->evaluateMostAccurateCurve($x);
+ *
+ * All mathematical functions for solving and evaluating each of the six supported
+ * regression curve types (methods) are contained within and fully public so that
+ * this class may be used for any other algebraic application thereof.
+ * 
  */
 
 class SparkRegression {
@@ -32,17 +49,25 @@ class SparkRegression {
 
   /**
    * Constructor
-   * @param $base_data_set - an array of cartesian coordinates formatted like so:
-   *        $base_data_set = array( array(X1, Y1),
-   *                                array(X2, Y2),
-   *                                array(X3, Y3),
-   *                                ...);
-   *        Coordinates in $base_data_set need not be in any particular order as
+   * @param $data_set - an array of cartesian coordinates formatted like so:
+   *        $data_set = array( array(X1, Y1),
+   *                           array(X2, Y2),
+   *                           array(X3, Y3),
+   *                           ...);
+   *        Coordinates in $data_set need not be in any particular order as
    *        they will be sorted by ascending x values immediately.
+   *
+   * @param $skip_verification - verification includes making sure the provided data set is
+   *                             well populated and consistent in order to produce a usable
+   *                             projection (e.g. a set with one point would fail verification).
+   *                             Set this to true for large data sets known to be good to save
+   *                             processing time.
+   *
+   * @param $store_mapping -  set true to store mapping values when doing accuracy calculation.
    */
   public function __construct ($data_set = array(), $skip_verification = false, $store_mapping = false){
 
-    // Verify the data set if necessary
+    // If directed to skip verification apply the passed data set straight to the base.
     if ($skip_verification){
       $this->base_data_set = $data_set;
       return;
@@ -89,7 +114,7 @@ class SparkRegression {
 
   // function generateAllCurves()
   // Generates regression curves for all active methods on the base data set.
-  // Also determines accuracy and quality ratings for all curves and identifies the best method
+  // Also determines accuracy and quality ratings for all curves and identifies the best method.
   // Quality utilizes $quality_calibration which is compared against the aggregate distance
   // derived by the accuracy calculation. It's usually best to just use the maximum value from
   // the data set. A $quality_calibration of 0 will be ignored.
@@ -162,7 +187,7 @@ class SparkRegression {
       $this->curves[$method]['data_map'] = array();
 
     for ($i = 0; $i < count($this->base_data_set); $i++){
-      $value    = array($this->base_data_set[$i][0], $this->evaluateCurve($method,$coefficients,$this->base_data_set[$i][0]));
+      $value    = array($this->base_data_set[$i][0], $this->evaluateCurve($method,$this->base_data_set[$i][0]));
       $distance = abs( $value[1] - $this->base_data_set[$i][1] );
       $rating  += $distance;
       if ($this->store_mapping)
@@ -199,38 +224,37 @@ class SparkRegression {
 
   // function evaluateMostAccurateCurve()
   // Helper function that will take a single x value and pass it to evaluateCurve using the
-  // most accurate method string and coefficients
+  // most accurate method string
   public function evaluateMostAccurateCurve($x = 0){
 
     return $this->evaluateCurve( $this->most_accurate_method,
-                                 $this->curves[$this->most_accurate_method]['coefficients'],
                                  $x );
 
   }
 
   // function evaluateCurve()
-  // Helper function that will take a method string, an array of coefficients, and an x value
-  // and pass the data to the appropriate curve evaluation function for the method
-  public function evaluateCurve($method = '', $coefficients = array(), $x = 0){
+  // Helper function that will take a method string and an x value and pass the data
+  // to the appropriate curve evaluation function for the method
+  public function evaluateCurve($method = '', $x = 0){
 
     $this->verifyMethod($method);
 
     switch ($method){
       case 'exponential':
-        return self::evaluateExponentialCurve($coefficients, $x);
+        return self::evaluateExponentialCurve($this->curves[$method]['coefficients'], $x);
         break;
       case 'linear':
-        return self::evaluateLinearCurve($coefficients, $x);
+        return self::evaluateLinearCurve($this->curves[$method]['coefficients'], $x);
         break;
       case 'logarithmic':
-        return self::evaluateLogarithmicCurve($coefficients, $x);
+        return self::evaluateLogarithmicCurve($this->curves[$method]['coefficients'], $x);
         break;
       case 'polynomial2':
       case 'polynomial3':
-        return self::evaluatePolynomialCurve($coefficients, $x);
+        return self::evaluatePolynomialCurve($this->curves[$method]['coefficients'], $x);
         break;
       case 'power':
-        return self::evaluatePowerCurve($coefficients, $x);
+        return self::evaluatePowerCurve($this->curves[$method]['coefficients'], $x);
         break;
       default:
         throw new Exception("Projection method is active but evaluation function does not exist");
