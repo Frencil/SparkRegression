@@ -5,6 +5,9 @@
  * 
  * @author Chris Clark <cclark@sparkfun.com>
  *
+ * NOTE: This class requires Pier-André Bouchard St-Amant's "matrix" class
+ * http://www.phpclasses.org/package/5793-PHP-Perform-operations-to-manipulate-matrices.html
+ *
  * BASIC USAGE
  *
  * $reg = new SparkRegression($data);
