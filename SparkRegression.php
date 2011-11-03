@@ -26,6 +26,8 @@
  * 
  */
 
+require("matrix.php");
+
 class SparkRegression {
 
   // Base data set - the array of points upon which we want to fit a regression curve.
