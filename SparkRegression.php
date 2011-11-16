@@ -5,9 +5,6 @@
  * 
  * @author Chris Clark <cclark@sparkfun.com>
  *
- * NOTE: This class requires Pier-André Bouchard St-Amant's "matrix" class
- * http://www.phpclasses.org/package/5793-PHP-Perform-operations-to-manipulate-matrices.html
- *
  * BASIC USAGE
  *
  * $reg = new SparkRegression($data);
@@ -25,8 +22,6 @@
  * this class may be used for any other algebraic application thereof.
  * 
  */
-
-require("matrix.php");
 
 class SparkRegression {
 
@@ -618,7 +613,14 @@ class SparkRegression {
   // approach by evaluating the curve at integer values of x within a defined domain and interpolating linearly
   // between bounding values to get an approximate solution to two decimal places. If no solution is found, returns 'unknown'.
   public static function solvePolynomialCurveByBruteForce($coefficients = array(), $y = 0, $domain_min = 0, $domain_max = 10, $step = 1){
-    
+   
+    $evals = 'SOLVE FOR Y = ' . $y . "\n";
+
+    // When PHP does a lot of this floating point math our equivalence comparisons can drift by a tiny margin.
+    // Tolerance is introduced as a function of the step size to round off our bound comparisons so that a
+    // difference of a billionth of a point does not cause equivalence to fail and produce an incorrect result.
+    $tolerance = abs(min(round(log10($step))-5,-1));
+
     $lower_bound_x = $domain_min;
     $upper_bound_x = $domain_max;
     $lower_bound_y = 0;
@@ -639,10 +641,10 @@ class SparkRegression {
         $lower_bound_y = $f_x;
       }
 
-      if ($f_x == $y){
+      if (round($f_x,$tolerance) == round($y,$tolerance)){
         return $x;
       } else if ($f_x < $y){
-        $lower_bound_x = $x;
+        $lower_bound_x = $x + $step;
         $lower_bound_y = $f_x;
       } else {
         $upper_bound_x = $x;
@@ -654,7 +656,7 @@ class SparkRegression {
 
     }
 
-    if ($lower_bound_x == $upper_bound_x)
+    if (round($lower_bound_x,$tolerance) == round($upper_bound_x,$tolerance))
       return 'unknown';
 
     else 
