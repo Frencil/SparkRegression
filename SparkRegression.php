@@ -629,8 +629,10 @@ class SparkRegression {
     if ((float)$step <= 0)
       $step = 1;
 
+    $ret = '';
+
     $x = $domain_min;
-    while ($x <= $domain_max){
+    while ($lower_bound_x <= $domain_max){
 
       $f_x =  self::evaluatePolynomialCurve($coefficients, $x);
 
@@ -641,10 +643,12 @@ class SparkRegression {
         $lower_bound_y = $f_x;
       }
 
+      $ret .= round($f_x,$tolerance) . ' ?== ' . round($y,$tolerance) . "\n";
+
       if (round($f_x,$tolerance) == round($y,$tolerance)){
         return $x;
       } else if ($f_x < $y){
-        $lower_bound_x = $x + $step;
+        $lower_bound_x = $x;
         $lower_bound_y = $f_x;
       } else {
         $upper_bound_x = $x;
