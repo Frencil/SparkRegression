@@ -281,11 +281,12 @@ class SparkRegression {
   // function solveCurve()
   // Helper function that will take a method string, an array of coefficients, and a y value
   // and pass the data to the appropriate curve solving function for the method.
-  // NOTE: sometimes the explicit inverse functions for some methods can only be solved with imaginary numbers.
-  //       rather than implement that the inverse is instead calculated using a brute-force approach that iterates
-  //       through evaluated integer values of x within a definable domain and interpolates linearly to find a
-  //       close approximation. Whenever using this method be sure to set the $domain_min and $domain_max to a range
-  //       that is likely to contain your solution.
+  // NOTE 1: For polynomial functions an array of values may be returned.
+  // NOTE 2: Sometimes the explicit inverse functions for some methods can only be solved with imaginary numbers.
+  //         rather than implement that the inverse is instead calculated using a brute-force approach that iterates
+  //         through evaluated integer values of x within a definable domain and interpolates linearly to find a
+  //         close approximation. Whenever using this method be sure to set the $domain_min and $domain_max to a range
+  //         that is likely to contain your solution.
   public function solveCurve($method = '', $coefficients = array(), $y = 0, $domain_min = 0, $domain_max = 10){
 
     $this->verifyMethod($method);
@@ -303,21 +304,10 @@ class SparkRegression {
       case 'polynomial2':
       case 'polynomial3':
         $x = self::solvePolynomialCurve($coefficients, $y);
-        if (is_array($x)){
-          $good_xs = array();
-          for ($i = 0; $i < count($x); $i++){
-            if (($x[$i] >= $domain_min) && ($x[$i] <= $domain_max)){
-              $good_xs[] = $x[$i];
-            }
-          }
-          if (count($good_xs) == 1)
-            return $good_xs[0];
-          else
-            return self::solvePolynomialCurveByBruteForce($coefficients, $y, $domain_min, $domain_max, .2);
-        } else if (is_nan($x))
-          return self::solvePolynomialCurveByBruteForce($coefficients, $y, $domain_min, $domain_max, .2);
-        else 
+        if (is_array($x) || (is_numeric($x) && !is_nan($x)))
           return $x;
+        else
+          return self::solvePolynomialCurveByBruteForce($coefficients, $y, $domain_min, $domain_max, .2);
         break;
       case 'power':
         return self::solvePowerCurve($coefficients, $y);
@@ -572,9 +562,9 @@ class SparkRegression {
         if ($a == 0)
           return null;
         else {
-          $pos = ( (-1*$b) + pow ( pow($b,2) - (4*$a*$c), 0.5) ) / (2*$a);
-          $neg = ( (-1*$b) - pow ( pow($b,2) - (4*$a*$c), 0.5) ) / (2*$a);
-          if (abs($pos) == abs($neg))
+          $pos = ( (-1*$b) + sqrt( pow($b,2)-(4*$a*$c) ) ) / (2*$a);
+          $neg = ( (-1*$b) - sqrt( pow($b,2)-(4*$a*$c) ) ) / (2*$a);
+          if ($pos == $neg)
             return $pos;
           else
             return array($pos, $neg);
@@ -587,16 +577,40 @@ class SparkRegression {
         $b = $coefficients['a2'];
         $c = $coefficients['a1'];
         $d = $coefficients['a0'] - $y;
-        if ($a == 0)
-          return null;
-        else {
-          $p = (-1*$b)/(3*$a);
-          $q = pow($p,3) + ( (($b*$c)-(3*$a*$d)) / (6*pow($a,2)) );
-          $r = $c / (3*$a);
-          $x = $p + pow( $q + pow( pow($q,2) + pow($r-pow($p,2), 3), 0.5), 1/3 )
-                  + pow( $q - pow( pow($q,2) + pow($r-pow($p,2), 3), 0.5), 1/3 );
-          return $x;
+        if ($a == 0) {
+          unset($coefficients['a3']);
+          $coefficients['m'] = 2;
+          return self::solvePolynomialCurve($coefficients, $y);
+        } else {
+          $discriminant = (18*$a*$b*$c*$d) - (4*pow($b,3)*$d) + (pow($b,2)*pow($c,2)) - (4*$a*pow($c,3)) - (27*pow($a,2)*pow($d,2));
+          $Q = sqrt(-27 * pow($a,2) * $discriminant);
+          $D = pow($b,2) - (3*$a*$c);
+          if ($D == 0){
+            if ($Q == 0)
+              $x = -$b / (3*$a);
+            else {
+              $Qpos = abs($Q);
+              $Qneg = abs($Q) * -1;
+              $C_Qpos = self::cuberoot(0.5*( $Qpos + (2*pow($b,3)) - (9*$a*$b*$c) + (27*pow($a,2)*$d)));
+              $C_Qneg = self::cuberoot(0.5*( $Qneg + (2*pow($b,3)) - (9*$a*$b*$c) + (27*pow($a,2)*$d)));
+              if (!is_nan($C_Qpos) && ($C_Qpos != 0)) $C = $C_Qpos;
+              if (!is_nan($C_Qneg) && ($C_Qneg != 0)) $C = $C_Qneg;
+              $x = (-$b/(3*$a)) - ($C/(3*$a)) - ( (pow($b,2)-(3*$a*$c)) / (3*$a*$C) );
+            }
+          } else {
+            if ($Q == 0){
+              $x = array();
+              $x[] = (($b*$c) - (9*$a*$d)) / (2 * ((3*$a*$c) - pow($b,2)));
+              $x[] = ((9*pow($a,2)*$d) - (4*$a*$b*$c) + pow($b,3)) / ($a * ((3*$a*$c) - pow($b,2)));
+            } else {
+              $C = (2*pow($b,3)) - (9*$a*$b*$c) + (27*pow($a,2)*$d);
+              $Rpos = self::cuberoot(0.5*($C+$Q));
+              $Rneg = self::cuberoot(0.5*($C-$Q));
+              $x = (-$b/(3*$a)) - ( (1/(3*$a)) * $Rpos ) - ( (1/(3*$a)) * $Rneg );
+            }
+          }
         }
+        return $x;
         break;
 
       // can't solve anything higher without some serious mathematical gymnastics.
@@ -716,6 +730,12 @@ class SparkRegression {
     else 
       return pow( $y / $coefficients['A'], 1 / $coefficients['B'] );
 
+  }
+
+  public static function cuberoot($base){
+    $root = pow(abs($base),1/3);
+    if ($base < 0) $root *= -1;
+    return $root;
   }
 
 
